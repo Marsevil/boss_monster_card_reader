@@ -1,0 +1,9 @@
+[workspace]
+members = [
+	"boss_monster_card_reader-core",
+	"boss_monster_card_reader-cli",
+]
+
+default-members = [
+	"boss_monster_card_reader-cli"
+]

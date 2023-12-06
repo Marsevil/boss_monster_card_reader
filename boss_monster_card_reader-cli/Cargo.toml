@@ -1,0 +1,11 @@
+[package]
+name = "boss_monster_card_reader-cli"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+boss_monster_card_reader-core = { path = "../boss_monster_card_reader-core", features = ["debug_card_finder"] }
+
+clap = { version = "4.4.11", features = ["derive"] }
