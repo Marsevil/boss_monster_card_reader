@@ -1,5 +1,4 @@
-use opencv::highgui as gui;
-use opencv::imgcodecs::{imread, IMREAD_GRAYSCALE};
+use image::io::Reader as ImageReader;
 use std::path::Path;
 use thiserror::Error;
 
@@ -7,27 +6,24 @@ use crate::Image;
 
 #[derive(Debug, Error)]
 pub enum LoadError {
-    #[error("The used path is not utf-8")]
-    UnusablePath,
-    #[error("Error while reading image")]
-    ReadError(opencv::Error),
+    #[error("Error on opening file")]
+    IOError(std::io::Error),
+    #[error("Decoding error")]
+    DecodeError(image::error::ImageError),
 }
 
 pub fn load_image(path: &Path) -> Result<Image, LoadError> {
-    let path = path.to_str().ok_or(LoadError::UnusablePath)?;
-    let img = imread(path, IMREAD_GRAYSCALE)
-        .map_err(|err| LoadError::ReadError(err))?
-        .try_into_typed::<u8>()
-        .unwrap();
+    //! Load an image from the disk
+    //!
+    //! # Error
+    //! - `LoadError::IOError` if the path is unusable
+    //! - `LoadError::DecodeError` if the image can't be read
 
-    if cfg!(all(debug_assertions, feature = "debug_imread")) {
-        const WINDOW_NAME: &str = "Debug imread";
-
-        println!("{}", WINDOW_NAME);
-        gui::named_window(WINDOW_NAME, gui::WINDOW_NORMAL).unwrap();
-        gui::imshow(WINDOW_NAME, &img).unwrap();
-        gui::wait_key(0).unwrap();
-    }
+    let img = ImageReader::open(path)
+        .map_err(|e| LoadError::IOError(e))?
+        .decode()
+        .map_err(|e| LoadError::DecodeError(e))?
+        .into_luma8();
 
     Ok(img)
 }

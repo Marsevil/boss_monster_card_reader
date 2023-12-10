@@ -1,57 +1,54 @@
-use opencv::highgui as gui;
-use opencv::imgproc::{bounding_rect, find_contours_def, morphology_ex_def, threshold};
-use opencv::prelude::*;
-use thiserror::Error;
+use image::{imageops, GrayImage};
+use image::{GenericImageView, SubImage};
 
+use imageproc::contours::find_contours;
+use imageproc::contrast::threshold;
+use imageproc::distance_transform::Norm;
+use imageproc::geometry::min_area_rect;
+use imageproc::morphology::open_mut;
+use imageproc::rect::Rect;
+
+pub mod diag;
 pub mod helpers;
 
-pub type Image = opencv::core::Mat_<u8>;
-pub type Roi = opencv::core::Rect_<i32>;
-type Curve = opencv::core::Vector<opencv::core::Vector<opencv::core::Point>>;
+pub type Image = image::GrayImage;
 
 pub struct CardInfos {
     pub name: String,
     pub description: String,
 }
 
-#[derive(Debug, Error)]
-pub enum ReadBatchError {
-    #[error("Error while finding card chunks")]
-    FindChunk(opencv::Error),
-    #[error("Error while reading card information")]
-    ReadCard(opencv::Error),
-}
-
-pub fn read_batch(img: &Image) -> Result<Vec<CardInfos>, ReadBatchError> {
+pub fn read_batch(img: &Image, diag: Option<&impl diag::Diagnostic>) -> Vec<CardInfos> {
     //! Extract card information from a scan of cards.
     //!
     //! 1. Extract card rois by executing `find_chunks`
     //! 2. Extract card information using `read_card` for each sub-image (`img(roi)`).
 
-    let card_rois = find_chunks(img).map_err(|e| ReadBatchError::FindChunk(e))?;
+    let card_rois = find_chunks(img, diag);
 
-    if cfg!(all(debug_assertions, feature = "debug_card_finder")) {
-        const WINDOW_NAME: &str = "Debug card finder";
-        gui::named_window(WINDOW_NAME, gui::WINDOW_NORMAL).unwrap();
-        for roi in &card_rois {
-            let card_img = Mat::roi(img.as_untyped(), roi.clone()).unwrap();
-            gui::imshow(WINDOW_NAME, &card_img).unwrap();
-            gui::wait_key(0).unwrap();
+    if cfg!(feature = "diag_card_finder") {
+        if let Some(diag) = diag {
+            diag.diag_card_finder(&card_rois);
         }
     }
 
-    let cards_infos = card_rois
+    let cards_infos: Vec<CardInfos> = card_rois
         .iter()
-        .map(|roi| Mat::roi(img.as_untyped(), roi.clone()).unwrap())
-        .map(|card| card.try_into_typed::<u8>().unwrap())
-        .map(|card| read_card(&card))
-        .collect::<Result<Vec<CardInfos>, _>>()
-        .map_err(|e| ReadBatchError::ReadCard(e));
+        .map(|roi| {
+            img.view(
+                roi.left().try_into().unwrap(),
+                roi.top().try_into().unwrap(),
+                roi.width(),
+                roi.height(),
+            )
+        })
+        .map(|view| read_card(view, diag))
+        .collect();
 
     cards_infos
 }
 
-fn find_chunks(img: &Image) -> Result<Vec<Roi>, opencv::Error> {
+fn find_chunks(img: &Image, diag: Option<&impl diag::Diagnostic>) -> Vec<Rect> {
     //! Extract the roi of each card by looking for contours after a binary threshold.
     //!
     //! 1. Binary threshold to isolate card from white background
@@ -59,81 +56,42 @@ fn find_chunks(img: &Image) -> Result<Vec<Roi>, opencv::Error> {
     //! 3. Retrieve bounding rect of each contours
 
     // Binary threshold the image
-    let mut bin = {
-        const THRESH_VAL: u8 = 200;
-
-        let mut res = Mat::default().try_into_typed::<u8>().unwrap();
-        threshold(
-            img,
-            &mut res,
-            THRESH_VAL.into(),
-            u8::MAX.into(),
-            opencv::imgproc::THRESH_BINARY_INV,
-        )?;
-        res
-    };
+    const THRESH_VAL: u8 = 200;
+    let mut bin = threshold(img, THRESH_VAL);
+    imageops::invert(&mut bin);
 
     // Open to remove noise
-    bin = {
-        const KERN_SIZE: (i32, i32) = (15, 15);
-        let kern = Mat::ones(KERN_SIZE.0, KERN_SIZE.1, opencv::core::CV_8U)
-            .unwrap()
-            .to_mat()
-            .unwrap()
-            .try_into_typed::<u8>()
-            .unwrap();
-        let mut res = Mat::default();
-        morphology_ex_def(&bin, &mut res, opencv::imgproc::MORPH_OPEN, &kern)?;
+    const KERN_SIZE: u8 = 15;
+    open_mut(&mut bin, Norm::LInf, KERN_SIZE);
 
-        res.try_into_typed::<u8>().unwrap()
-    };
-
-    // find contours
-    let contours = {
-        let mut contours = Curve::default();
-        find_contours_def(
-            &bin,
-            &mut contours,
-            opencv::imgproc::RETR_EXTERNAL,
-            opencv::imgproc::CHAIN_APPROX_SIMPLE,
-        )?;
-
-        contours
-    };
-
-    // Approx contours to rectangles
-    let rois = contours
-        .iter()
-        .map(|contour| {
-            let roi = bounding_rect(&contour);
-            roi
-        })
-        .collect::<opencv::Result<Vec<Roi>>>()?;
-
-    if cfg!(all(debug_assertions, feature = "debug_card_finder")) {
-        const WINDOW_NAME: &str = "Debug card finder";
-        const CONTOURS_COLOR: (i32, i32, i32) = (0, 0, 255);
-        const ROI_COLOR: (i32, i32, i32) = (255, 0, 0);
-
-        println!("Debug card finder");
-        let mut img = {
-            let mut res = Mat::default();
-            opencv::imgproc::cvt_color_def(img, &mut res, opencv::imgproc::COLOR_GRAY2BGR).unwrap();
-            res.try_into_typed::<opencv::core::Vec3b>().unwrap()
-        };
-        opencv::imgproc::draw_contours_def(&mut img, &contours, -1, CONTOURS_COLOR.into()).unwrap();
-        for rect in &rois {
-            opencv::imgproc::rectangle_def(&mut img, rect.clone(), ROI_COLOR.into()).unwrap();
+    if cfg!(feature = "diag_card_finder") {
+        if let Some(diag) = diag {
+            diag.diag_card_finder_thresh(&bin);
         }
-        gui::named_window(WINDOW_NAME, gui::WINDOW_NORMAL).unwrap();
-        gui::imshow(WINDOW_NAME, &img).unwrap();
-        gui::wait_key(0).unwrap();
     }
 
-    Ok(rois)
+    // Find external contours
+    // Approx contours to rectangles
+    let rois: Vec<Rect> = find_contours(&bin)
+        .into_iter()
+        // .filter(|contour| contour.border_type == BorderType::Outer)
+        .filter(|contour| contour.parent.is_none())
+        .map(|contour| min_area_rect(&contour.points))
+        .map(|rect| {
+            let x = rect.iter().map(|p| p.x).min().unwrap();
+            let y = rect.iter().map(|p| p.y).min().unwrap();
+            let x_max = rect.iter().map(|p| p.x).max().unwrap();
+            let y_max = rect.iter().map(|p| p.y).max().unwrap();
+            let width = x_max - x;
+            let height = y_max - y;
+            Rect::at(x, y).of_size(width.try_into().unwrap(), height.try_into().unwrap())
+        })
+        .collect();
+
+    rois
 }
 
-fn read_card(img: &Image) -> Result<CardInfos, opencv::Error> {
+fn read_card(img: SubImage<&GrayImage>, diag: Option<&impl diag::Diagnostic>) -> CardInfos {
     //! Read the information from a card image.
 
     todo!();
