@@ -12,3 +12,4 @@ thiserror = "1.0.50"
 
 [features]
 diag_card_finder = []
+diag_find_text_chunks = []

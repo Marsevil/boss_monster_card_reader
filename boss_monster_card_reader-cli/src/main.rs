@@ -29,26 +29,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (idx, path) in args.img_paths.iter().enumerate() {
         let img = load_image(path)?;
 
-        let diag_folder_path = args.diag_folder_path.as_ref().map(|path| {
-            let folder_name = format!("scan_{}", idx);
-            path.join(folder_name)
-        });
-
-        if cfg!(feature = "diag_reading") {
-            if let Some(diag_folder_path) = diag_folder_path.as_ref() {
-                const FILE_NAME: &str = "read.png";
-                let file_path = diag_folder_path.join(FILE_NAME);
-                img.save(file_path).unwrap();
-            }
-        }
-
         let diag = args
             .diag_folder_path
             .as_ref()
-            .map(|diag_folder_path| diag::CliDiag {
-                input_image: &img,
-                output_path: diag_folder_path.to_path_buf(),
-            });
+            .map(|path| {
+                let folder_name = format!("scan_{}", idx);
+                path.join(folder_name)
+            })
+            .map(|path| diag::CliDiag::new(path));
+
+        if cfg!(feature = "diag_reading") {
+            if let Some(diag) = diag.as_ref() {
+                diag.diag_reading(&img);
+            }
+        }
 
         let infos = read_batch(&img, diag.as_ref());
     }

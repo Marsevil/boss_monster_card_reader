@@ -1,9 +1,9 @@
 use imageproc::rect::Rect;
 
-use crate::{CardInfos, Image};
+use crate::{CardInfosTextChunks, Image};
 
 pub trait Diagnostic {
-    fn diag_card_finder(&self, _rois: &Vec<Rect>) {}
+    fn diag_card_finder(&self, _src_img: &Image, _rois: &Vec<Rect>) {}
     fn diag_card_finder_thresh(&self, _bin: &Image) {}
-    fn diag_card_reading(&self, _idx: usize, _infos: &CardInfos) {}
+    fn diag_find_text_chunks_thresh(&self, _bin: &Image, _chunks: &CardInfosTextChunks) {}
 }
