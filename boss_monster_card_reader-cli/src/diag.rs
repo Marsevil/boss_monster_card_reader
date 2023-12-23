@@ -59,7 +59,9 @@ impl Diagnostic for CliDiag {
         img.save(&file_path).unwrap();
     }
 
-    fn diag_find_text_chunks_thresh(&self, bin: &Image, _chunks: &CardInfosTextChunks) {
+    fn diag_find_text_chunks(&self, src_img: &Image, chunks: &CardInfosTextChunks) {
+        const ROI_COLOR: [u8; 3] = [255, 0, 0];
+
         // To avoid conflict file name we use an internal counter for each function call
         let count = self.diag_find_text_chunks_thresh_count.get();
         self.diag_find_text_chunks_thresh_count.set(count + 1);
@@ -69,8 +71,12 @@ impl Diagnostic for CliDiag {
         // Check folder
         std::fs::create_dir_all(self.output_path.as_path()).unwrap();
 
+        let mut img: image::RgbImage = src_img.convert();
+        draw_hollow_rect_mut(&mut img, chunks.name.clone(), ROI_COLOR.into());
+        draw_hollow_rect_mut(&mut img, chunks.description.clone(), ROI_COLOR.into());
+
         let file_path = self.output_path.join(file_name);
 
-        bin.save(file_path).unwrap();
+        img.save(file_path).unwrap();
     }
 }

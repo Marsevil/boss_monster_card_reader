@@ -5,7 +5,7 @@ use imageproc::contours::find_contours;
 use imageproc::contrast::threshold;
 use imageproc::distance_transform::Norm;
 use imageproc::geometry::min_area_rect;
-use imageproc::morphology::{close_mut, open_mut};
+use imageproc::morphology::open_mut;
 use imageproc::rect::Rect;
 
 pub mod diag;
@@ -58,28 +58,8 @@ pub fn read_batch(img: &Image, diag: Option<&impl diag::Diagnostic>) -> Vec<Card
             (view, chunks)
         })
         .map(|(view, chunks)| {
-            let (name, description) = (chunks.name, chunks.description);
-            let name_view = view
-                .view(
-                    name.left().try_into().unwrap(),
-                    name.top().try_into().unwrap(),
-                    name.width(),
-                    name.height(),
-                )
-                .to_image();
-            let description_view = view
-                .view(
-                    description.left().try_into().unwrap(),
-                    description.top().try_into().unwrap(),
-                    description.width(),
-                    description.height(),
-                )
-                .to_image();
-
-            CardInfosSubImages {
-                name: name_view,
-                description: description_view,
-            }
+            let subs = extract_infos_subviews(&view, chunks);
+            subs
         })
         .map(|info_view| read_card(info_view, diag))
         .collect();
@@ -131,23 +111,77 @@ fn find_chunks(img: &Image, diag: Option<&impl diag::Diagnostic>) -> Vec<Rect> {
 }
 
 fn find_text_chunks(img: &Image, diag: Option<&impl diag::Diagnostic>) -> CardInfosTextChunks {
-    const THRESH_VAL: u8 = 200;
-    const KERN_SIZE: u8 = 20;
+    //! Extract text chunks based **only** on a fixed position extracted from a reference image.
 
-    let mut bin = threshold(&img, THRESH_VAL);
-    close_mut(&mut bin, Norm::LInf, KERN_SIZE);
+    let name_roi = {
+        // Measures taken on the real card
+        const LU_CORNER_OFFSET_RATIO: (f32, f32) =
+            (136.0 / 732.0, (116.0 - 54.0) / (1115.0 - 54.0));
+        const DIM_RATIO: (f32, f32) = ((657.0 - 136.0) / 732.0, (216.0 - 116.0) / (1115.0 - 54.0));
+
+        let x = img.width() as f32 * LU_CORNER_OFFSET_RATIO.0;
+        let y = img.height() as f32 * LU_CORNER_OFFSET_RATIO.1;
+        let width = img.width() as f32 * DIM_RATIO.0;
+        let height = img.height() as f32 * DIM_RATIO.1;
+
+        let roi = Rect::at(x as _, y as _).of_size(width as _, height as _);
+        roi
+    };
+
+    let description_roi = {
+        const LU_CORNER_OFFSET_RATIO: (f32, f32) = (62.0 / 732.0, (750.0 - 54.0) / (1115.0 - 54.0));
+        const DIM_RATIO: (f32, f32) = ((653.0 - 62.0) / 732.0, (917.0 - 750.0) / (1115.0 - 54.0));
+
+        let x = img.width() as f32 * LU_CORNER_OFFSET_RATIO.0;
+        let y = img.height() as f32 * LU_CORNER_OFFSET_RATIO.1;
+        let width = img.width() as f32 * DIM_RATIO.0;
+        let height = img.height() as f32 * DIM_RATIO.1;
+
+        let roi = Rect::at(x as _, y as _).of_size(width as _, height as _);
+        roi
+    };
+
+    let chunks = CardInfosTextChunks {
+        name: name_roi,
+        description: description_roi,
+    };
 
     if cfg!(feature = "diag_find_text_chunks") {
         if let Some(diag) = diag {
-            let dangling_chunks = CardInfosTextChunks {
-                name: Rect::at(0, 0).of_size(1, 1),
-                description: Rect::at(0, 0).of_size(1, 1),
-            };
-            diag.diag_find_text_chunks_thresh(&bin, &dangling_chunks);
+            diag.diag_find_text_chunks(img, &chunks);
         }
     }
 
-    todo!();
+    chunks
+}
+
+fn extract_infos_subviews(view: &Image, chunks: CardInfosTextChunks) -> CardInfosSubImages {
+    let name_sub_img = {
+        let rect = chunks.name;
+        let view = view.view(
+            rect.left() as _,
+            rect.top() as _,
+            rect.width(),
+            rect.height(),
+        );
+        view.to_image()
+    };
+
+    let description_sub_img = {
+        let rect = chunks.description;
+        let view = view.view(
+            rect.left() as _,
+            rect.top() as _,
+            rect.width(),
+            rect.height(),
+        );
+        view.to_image()
+    };
+
+    CardInfosSubImages {
+        name: name_sub_img,
+        description: description_sub_img,
+    }
 }
 
 fn read_card(views: CardInfosSubImages, diag: Option<&impl diag::Diagnostic>) -> CardInfos {
