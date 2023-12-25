@@ -5,7 +5,7 @@ use imageproc::contours::find_contours;
 use imageproc::contrast::{threshold, threshold_mut};
 use imageproc::distance_transform::Norm;
 use imageproc::geometry::min_area_rect;
-use imageproc::morphology::open_mut;
+use imageproc::morphology::{close_mut, open_mut};
 use imageproc::rect::Rect;
 
 pub mod diag;
@@ -79,6 +79,7 @@ fn find_chunks(img: &Image, diag: Option<&impl diag::Diagnostic>) -> Vec<Rect> {
     // Open to remove noise
     const KERN_SIZE: u8 = 15;
     open_mut(&mut bin, Norm::LInf, KERN_SIZE);
+    close_mut(&mut bin, Norm::LInf, KERN_SIZE);
 
     if cfg!(feature = "diag_card_finder") {
         if let Some(diag) = diag {
