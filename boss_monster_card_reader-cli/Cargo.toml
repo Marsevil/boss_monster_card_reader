@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-boss_monster_card_reader-core = { path = "../boss_monster_card_reader-core", features = ["diag_find_text_chunks", "diag_card_finder"] }
+boss_monster_card_reader-core = { path = "../boss_monster_card_reader-core", features = ["diag_find_text_chunks", "diag_card_finder", "diag_read_card"] }
 
 clap = { version = "4.4.11", features = ["derive"] }
 image = "0.24.7"

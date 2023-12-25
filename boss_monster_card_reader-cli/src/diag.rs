@@ -13,6 +13,8 @@ pub struct CliDiag {
     pub output_path: PathBuf,
 
     diag_find_text_chunks_thresh_count: Cell<usize>,
+    diag_read_card_name_count: Cell<usize>,
+    diag_read_card_description_count: Cell<usize>,
 }
 
 impl CliDiag {
@@ -20,6 +22,8 @@ impl CliDiag {
         Self {
             output_path,
             diag_find_text_chunks_thresh_count: Cell::new(0),
+            diag_read_card_name_count: Cell::new(0),
+            diag_read_card_description_count: Cell::new(0),
         }
     }
 
@@ -78,5 +82,31 @@ impl Diagnostic for CliDiag {
         let file_path = self.output_path.join(file_name);
 
         img.save(file_path).unwrap();
+    }
+
+    fn diag_read_card_name(&self, input_img: &Image) {
+        let count = self.diag_read_card_name_count.get();
+        self.diag_read_card_name_count.set(count + 1);
+
+        let file_name = format!("card_name_input_{}.png", count);
+
+        std::fs::create_dir_all(self.output_path.as_path()).unwrap();
+
+        let file_path = self.output_path.join(file_name);
+
+        input_img.save(file_path).unwrap();
+    }
+
+    fn diag_read_card_description(&self, input_img: &Image) {
+        let count = self.diag_read_card_description_count.get();
+        self.diag_read_card_description_count.set(count + 1);
+
+        let file_name = format!("card_description_input_{}.png", count);
+
+        std::fs::create_dir_all(self.output_path.as_path()).unwrap();
+
+        let file_path = self.output_path.join(file_name);
+
+        input_img.save(file_path).unwrap();
     }
 }

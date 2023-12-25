@@ -180,7 +180,7 @@ fn extract_infos_subviews(view: &Image, chunks: CardInfosTextChunks) -> CardInfo
     }
 }
 
-fn read_card(views: CardInfosSubImages, _diag: Option<&impl diag::Diagnostic>) -> CardInfos {
+fn read_card(views: CardInfosSubImages, diag: Option<&impl diag::Diagnostic>) -> CardInfos {
     //! Read the information from a card image.
 
     use leptess::LepTess;
@@ -195,6 +195,12 @@ fn read_card(views: CardInfosSubImages, _diag: Option<&impl diag::Diagnostic>) -
     let name = {
         let mut subimg = views.name;
         threshold_mut(&mut subimg, THRESH_VAL);
+
+        if cfg!(feature = "diag_read_card") {
+            if let Some(diag) = diag {
+                diag.diag_read_card_name(&subimg);
+            }
+        }
 
         let mut raw_data = Vec::new();
         subimg
@@ -215,6 +221,12 @@ fn read_card(views: CardInfosSubImages, _diag: Option<&impl diag::Diagnostic>) -
     let description = {
         let mut subimg = views.description;
         threshold_mut(&mut subimg, THRESH_VAL);
+
+        if cfg!(feature = "diag_read_card") {
+            if let Some(diag) = diag {
+                diag.diag_read_card_description(&subimg);
+            }
+        }
 
         let mut raw_data = Vec::new();
         subimg
