@@ -11,3 +11,6 @@ boss_monster_card_reader-core = { path = "../boss_monster_card_reader-core", fea
 clap = { version = "4.4.11", features = ["derive"] }
 image = "0.24.7"
 imageproc = "0.23.0"
+serde = "1.0.193"
+serde_json = "1.0.108"
+thiserror = "1.0.51"

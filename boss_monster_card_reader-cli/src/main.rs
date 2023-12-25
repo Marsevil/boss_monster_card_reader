@@ -1,10 +1,12 @@
-use clap::Parser;
 use std::path::PathBuf;
+
+use clap::Parser;
 
 use boss_monster_card_reader_core::helpers::load_image;
 use boss_monster_card_reader_core::read_batch;
 
 mod diag;
+mod writer;
 
 #[derive(Debug, Clone, Parser)]
 struct Args {
@@ -26,6 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // TODO: Check output type to be supported.
 
+    let mut acc_infos = Vec::new();
     for (idx, path) in args.img_paths.iter().enumerate() {
         let img = load_image(path)?;
 
@@ -45,7 +48,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let infos = read_batch(&img, diag.as_ref());
+        acc_infos.extend(infos.into_iter());
     }
+
+    writer::write_disk(&args.out_path, acc_infos)?;
 
     Ok(())
 }

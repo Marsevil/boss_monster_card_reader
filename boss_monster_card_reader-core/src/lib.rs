@@ -2,7 +2,7 @@ use image::imageops;
 use image::GenericImageView;
 
 use imageproc::contours::find_contours;
-use imageproc::contrast::threshold;
+use imageproc::contrast::{threshold, threshold_mut};
 use imageproc::distance_transform::Norm;
 use imageproc::geometry::min_area_rect;
 use imageproc::morphology::open_mut;
@@ -93,7 +93,7 @@ fn find_chunks(img: &Image, diag: Option<&impl diag::Diagnostic>) -> Vec<Rect> {
     // Approx contours to rectangles
     let rois: Vec<Rect> = find_contours(&bin)
         .into_iter()
-        // .filter(|contour| contour.border_type == BorderType::Outer)
+        .filter(|contour| contour.border_type == imageproc::contours::BorderType::Outer)
         .filter(|contour| contour.parent.is_none())
         .map(|contour| min_area_rect(&contour.points))
         .map(|rect| {
@@ -184,11 +184,60 @@ fn extract_infos_subviews(view: &Image, chunks: CardInfosTextChunks) -> CardInfo
     }
 }
 
-fn read_card(views: CardInfosSubImages, diag: Option<&impl diag::Diagnostic>) -> CardInfos {
+fn read_card(views: CardInfosSubImages, _diag: Option<&impl diag::Diagnostic>) -> CardInfos {
     //! Read the information from a card image.
 
-    todo!("reading part");
-    let card_infos;
+    use leptess::LepTess;
+
+    const THRESH_VAL: u8 = 200;
+    // TODO: Set value
+    const TRAINED_DATA_DIR: Option<&str> = None;
+    const TRAINED_DATA_NAME: &str = "fra";
+
+    let mut reader = LepTess::new(TRAINED_DATA_DIR, TRAINED_DATA_NAME).unwrap();
+
+    let name = {
+        let mut subimg = views.name;
+        threshold_mut(&mut subimg, THRESH_VAL);
+
+        let mut raw_data = Vec::new();
+        subimg
+            .write_to(
+                &mut std::io::Cursor::new(&mut raw_data),
+                image::ImageOutputFormat::Tiff,
+            )
+            .unwrap();
+
+        reader.set_image_from_mem(&raw_data).unwrap();
+        let mut text = reader.get_utf8_text().unwrap();
+
+        text = text.split_once('\n').unwrap().0.to_string();
+
+        text
+    };
+
+    let description = {
+        let mut subimg = views.description;
+        threshold_mut(&mut subimg, THRESH_VAL);
+
+        let mut raw_data = Vec::new();
+        subimg
+            .write_to(
+                &mut std::io::Cursor::new(&mut raw_data),
+                image::ImageOutputFormat::Tiff,
+            )
+            .unwrap();
+
+        reader.set_image_from_mem(&raw_data).unwrap();
+        let mut text = reader.get_utf8_text().unwrap();
+
+        text = text.replace('\n', " ");
+        text = text.trim().to_string();
+
+        text
+    };
+
+    let card_infos = CardInfos { name, description };
 
     card_infos
 }
