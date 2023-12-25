@@ -185,8 +185,8 @@ fn read_card(views: CardInfosSubImages, diag: Option<&impl diag::Diagnostic>) ->
 
     use leptess::LepTess;
 
-    const THRESH_VAL: u8 = 200;
-    // TODO: Set value
+    const NAME_THRESH_VAL: u8 = 190;
+    const DESC_THRESH_VAL: u8 = 150;
     const TRAINED_DATA_DIR: Option<&str> = None;
     const TRAINED_DATA_NAME: &str = "fra";
 
@@ -194,7 +194,7 @@ fn read_card(views: CardInfosSubImages, diag: Option<&impl diag::Diagnostic>) ->
 
     let name = {
         let mut subimg = views.name;
-        threshold_mut(&mut subimg, THRESH_VAL);
+        threshold_mut(&mut subimg, NAME_THRESH_VAL);
 
         if cfg!(feature = "diag_read_card") {
             if let Some(diag) = diag {
@@ -220,7 +220,7 @@ fn read_card(views: CardInfosSubImages, diag: Option<&impl diag::Diagnostic>) ->
 
     let description = {
         let mut subimg = views.description;
-        threshold_mut(&mut subimg, THRESH_VAL);
+        threshold_mut(&mut subimg, DESC_THRESH_VAL);
 
         if cfg!(feature = "diag_read_card") {
             if let Some(diag) = diag {
@@ -240,7 +240,11 @@ fn read_card(views: CardInfosSubImages, diag: Option<&impl diag::Diagnostic>) ->
         let mut text = reader.get_utf8_text().unwrap();
 
         text = text.replace('\n', " ");
-        text = text.trim().to_string();
+        text = text
+            .trim()
+            .split_inclusive(char::is_whitespace)
+            .filter(|part| !part.trim().is_empty())
+            .collect();
 
         text
     };
