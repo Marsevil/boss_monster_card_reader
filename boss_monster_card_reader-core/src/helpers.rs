@@ -20,9 +20,9 @@ pub fn load_image(path: &Path) -> Result<Image, LoadError> {
     //! - `LoadError::DecodeError` if the image can't be read
 
     let img = ImageReader::open(path)
-        .map_err(|e| LoadError::IOError(e))?
+        .map_err(LoadError::IOError)?
         .decode()
-        .map_err(|e| LoadError::DecodeError(e))?
+        .map_err(LoadError::DecodeError)?
         .into_luma8();
 
     Ok(img)

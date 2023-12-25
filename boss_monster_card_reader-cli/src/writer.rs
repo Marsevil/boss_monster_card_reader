@@ -36,13 +36,10 @@ pub fn write_disk(path: &Path, infos: Vec<CardInfos>) -> Result<(), WriteError> 
         std::fs::create_dir_all(path)?;
     }
 
-    let infos: Vec<_> = infos.into_iter().map(|e| SerdeCardInfos(e)).collect();
+    let infos: Vec<_> = infos.into_iter().map(SerdeCardInfos).collect();
 
-    let buf = match path.extension().map(|e| e.to_str()).flatten() {
-        Some("json") => {
-            let buf = serde_json::to_string_pretty(&infos).unwrap();
-            buf
-        }
+    let buf = match path.extension().and_then(|e| e.to_str()) {
+        Some("json") => serde_json::to_string_pretty(&infos).unwrap(),
         _ => return Err(WriteError::UnsupportedType),
     };
 

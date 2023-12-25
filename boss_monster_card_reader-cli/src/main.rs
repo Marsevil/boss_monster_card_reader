@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let folder_name = format!("scan_{}", idx);
                 path.join(folder_name)
             })
-            .map(|path| diag::CliDiag::new(path));
+            .map(diag::CliDiag::new);
 
         if cfg!(feature = "diag_reading") {
             if let Some(diag) = diag.as_ref() {

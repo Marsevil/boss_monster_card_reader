@@ -57,10 +57,7 @@ pub fn read_batch(img: &Image, diag: Option<&impl diag::Diagnostic>) -> Vec<Card
             let chunks = find_text_chunks(&view, diag);
             (view, chunks)
         })
-        .map(|(view, chunks)| {
-            let subs = extract_infos_subviews(&view, chunks);
-            subs
-        })
+        .map(|(view, chunks)| extract_infos_subviews(&view, chunks))
         .map(|info_view| read_card(info_view, diag))
         .collect();
 
@@ -124,8 +121,7 @@ fn find_text_chunks(img: &Image, diag: Option<&impl diag::Diagnostic>) -> CardIn
         let width = img.width() as f32 * DIM_RATIO.0;
         let height = img.height() as f32 * DIM_RATIO.1;
 
-        let roi = Rect::at(x as _, y as _).of_size(width as _, height as _);
-        roi
+        Rect::at(x as _, y as _).of_size(width as _, height as _)
     };
 
     let description_roi = {
@@ -137,8 +133,7 @@ fn find_text_chunks(img: &Image, diag: Option<&impl diag::Diagnostic>) -> CardIn
         let width = img.width() as f32 * DIM_RATIO.0;
         let height = img.height() as f32 * DIM_RATIO.1;
 
-        let roi = Rect::at(x as _, y as _).of_size(width as _, height as _);
-        roi
+        Rect::at(x as _, y as _).of_size(width as _, height as _)
     };
 
     let chunks = CardInfosTextChunks {
@@ -237,7 +232,5 @@ fn read_card(views: CardInfosSubImages, _diag: Option<&impl diag::Diagnostic>) -
         text
     };
 
-    let card_infos = CardInfos { name, description };
-
-    card_infos
+    CardInfos { name, description }
 }

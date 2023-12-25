@@ -42,7 +42,7 @@ impl Diagnostic for CliDiag {
         bin.save(&file_path).unwrap();
     }
 
-    fn diag_card_finder(&self, src_img: &Image, rois: &Vec<Rect>) {
+    fn diag_card_finder(&self, src_img: &Image, rois: &[Rect]) {
         const FILE_NAME: &str = "diag_card_region.png";
         const ROI_COLOR: [u8; 3] = [255, 0, 0];
 
@@ -53,7 +53,7 @@ impl Diagnostic for CliDiag {
 
         let mut img: image::RgbImage = src_img.convert();
         for roi in rois {
-            draw_hollow_rect_mut(&mut img, roi.clone(), ROI_COLOR.into());
+            draw_hollow_rect_mut(&mut img, *roi, ROI_COLOR.into());
         }
 
         img.save(&file_path).unwrap();
@@ -72,8 +72,8 @@ impl Diagnostic for CliDiag {
         std::fs::create_dir_all(self.output_path.as_path()).unwrap();
 
         let mut img: image::RgbImage = src_img.convert();
-        draw_hollow_rect_mut(&mut img, chunks.name.clone(), ROI_COLOR.into());
-        draw_hollow_rect_mut(&mut img, chunks.description.clone(), ROI_COLOR.into());
+        draw_hollow_rect_mut(&mut img, chunks.name, ROI_COLOR.into());
+        draw_hollow_rect_mut(&mut img, chunks.description, ROI_COLOR.into());
 
         let file_path = self.output_path.join(file_name);
 
